@@ -11,11 +11,18 @@ document.addEventListener('DOMContentLoaded', function () {
   const cartWrapper = document.querySelector('.cart-wrapper');
 
   let wishlist = [];
-  let goodsBasket = {};
+  const goodsBasket = {};
 
-  const loading = () => {
-    goodsWrapper.innerHTML = `<div id="spinner"><div class="spinner-loading"><div><div><div></div>
-</div><div><div></div></div><div><div></div></div><div><div></div></div></div></div></div>`
+  const loading = (nameFunction) => {
+    const spinner = `<div id="spinner"><div class="spinner-loading"><div><div><div></div>
+</div><div><div></div></div><div><div></div></div><div><div></div></div></div></div></div>`;
+
+    if (nameFunction === 'renderCard') {
+      goodsWrapper.innerHTML = spinner;
+    }
+    if (nameFunction === 'renderBasket') {
+      cartWrapper.innerHTML = spinner;
+    }
   };
 
   const createCardGoods = (id, title, price, img) => {
@@ -75,7 +82,7 @@ document.addEventListener('DOMContentLoaded', function () {
 							<button class="goods-add-wishlist ${wishlist.includes(id) ? 'active' : ''}" data-goods-id="${id}"></button>
 							<button class="goods-delete" data-goods-id="${id}"></button>
 						</div>
-						<div class="goods-count">1</div>
+						<div class="goods-count">${goodsBasket[id]}</div>
 					</div>
     `;
     return card;
@@ -112,7 +119,22 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   };
 
-  const showCardBasket = goods => goods.filter(item => goodsBasket.hasOwnProperty(item.id));
+  const calcTotalPrice = goods => {
+    let sum = goods.reduce((accum, item) => {
+      return accum + item.price * goodsBasket[item.id];
+    }, 0)
+    // let sum = 0;
+    // for (const item of goods) {
+    //   sum += item.price * goodsBasket[item.id];
+    // }
+    cart.querySelector('.cart-total>span').textContent = sum.toFixed(2);
+  };
+
+  const showCardBasket = goods => {
+    const basketGoods = goods.filter(item => goodsBasket.hasOwnProperty(item.id));
+    calcTotalPrice(basketGoods);
+    return basketGoods;
+  };
 
   const openCart = (e) => {
     e.preventDefault();
@@ -122,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function () {
   };
 
   const getGoods = (handler, filter) => {
-    // loading();
+    loading(handler.name);
     fetch('db/db.json')
       .then((response) => {
         return response.json()
@@ -174,12 +196,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
   const cookieQuery = get => {
     if (get) {
-      goodsBasket = JSON.parse(getCookie('goodsBasket'));
+      if (getCookie('goodsBasket')) {
+        Object.assign(goodsBasket, JSON.parse(getCookie('goodsBasket')));
+        // goodsBasket = JSON.parse(getCookie('goodsBasket'));
+      }
       checkCounter();
     } else {
       document.cookie = `goodsBasket=${JSON.stringify(goodsBasket)};max-age=86400e3`;
     }
-    console.log(goodsBasket);
   };
 
   const checkCounter = () => {
@@ -190,8 +214,9 @@ document.addEventListener('DOMContentLoaded', function () {
   const storageQuery = (get) => {
     if (get) {
       if (localStorage.getItem('wishlist')) {
-        const wishlistStorage = JSON.parse(localStorage.getItem('wishlist'));
-        wishlistStorage.forEach(id => wishlist.push(id));
+        wishlist.splice(0, 0, ...JSON.parse(localStorage.getItem('wishlist')));
+        // const wishlistStorage = JSON.parse(localStorage.getItem('wishlist'));
+        // wishlistStorage.forEach(id => wishlist.push(id));
       }
       checkCounter();
     } else {
@@ -217,7 +242,6 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
       goodsBasket[id] = 1;
     }
-    console.log(goodsBasket[id])
     checkCounter();
     cookieQuery();
   }
@@ -236,11 +260,31 @@ document.addEventListener('DOMContentLoaded', function () {
     getGoods(renderCard, goods => goods.filter(item => wishlist.includes(item.id)));
   };
 
+  const removeGoods = id => {
+    delete goodsBasket[id];
+    checkCounter();
+    cookieQuery();
+    getGoods(renderBasket, showCardBasket);
+  };
+
+  const handlerBasket = (e) => {
+    const target = e.target;
+    if (target.classList.contains('goods-add-wishlist')) {
+      toggleWishlist(target.dataset.goodsId, target);
+    };
+    if (target.classList.contains('goods-delete')) {
+      removeGoods(target.dataset.goodsId);
+    };
+  };
+
+
+
   cartBtn.addEventListener('click', openCart);
   cart.addEventListener('click', closeCart);
   category.addEventListener('click', chooseCategory);
   search.addEventListener('submit', searchGoods);
   goodsWrapper.addEventListener('click', handlerGoods);
+  cartWrapper.addEventListener('click', handlerBasket);
   wishlistBtn.addEventListener('click', showWishlist);
 
   getGoods(renderCard, randomSort);
